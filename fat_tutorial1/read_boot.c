@@ -8,7 +8,7 @@ typedef struct {
     unsigned char end_chs[3];
     unsigned long start_sector;
     unsigned long length_sectors;
-} __attribute((packed)) PartitionTable;
+} __attribute__((packed)) PartitionTable;
 
 typedef struct {
     unsigned char jmp[3];
@@ -34,7 +34,7 @@ typedef struct {
     char fs_type[8];
     char boot_code[448];
     unsigned short boot_sector_signature;
-} __attribute((packed)) Fat16BootSector;
+} __attribute__((packed)) Fat16BootSector;
 
 int main() {
     FILE * in = fopen("test.img", "rb");
