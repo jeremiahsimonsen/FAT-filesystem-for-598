@@ -6,6 +6,8 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include "root_dir.h"
+
 #define IMAGE_FILE "fat.img"
 
 #define PARTITION_TABLE_OFFSET 0x1BE
@@ -24,43 +26,44 @@ typedef struct {
 	uint8_t end_chs[3];		///< end of partition in CHS-addressing
 	uint32_t start_sector;	///< relative offset to partition in sectors (LBA)
 	uint32_t size_sectors;	///< size of partition in sectors
-} __attribute((packed)) Partition;
+} __attribute__((packed)) Partition;
 
 typedef struct {
-	uint8_t 	jump[3];				///< Intel 80x86 jump instruction
-	uint8_t		oem_name[8];			///< OEM name
-	uint16_t 	sector_size;			///< Sector size in Bytes
-	uint8_t 	sectors_per_cluster;	///< Number of sectors per cluster
-	uint16_t	reserved_sectors;		///< Reserved sectors (including boot)
-	uint8_t 	num_FATs;				///< Number of FATs
-	uint16_t	num_root_entries;		///< Number entries in root dir
-	uint16_t 	total_sectors_short;	///< Total # of sectors; if 0 later 
-										///<   field used
-	uint8_t 	media_descriptor;		///< Media descriptor
-	uint16_t 	sectors_per_FAT;		///< Number of sectors per FAT
-	uint16_t 	sectors_per_cylinder;	///< Number of sectors per track 
-										///<   (cylinder), CHS addressing
-	uint16_t 	num_heads;				///< Number of heads, CHS addressing
-	uint32_t 	num_hidden_sectors;		///< Number of hidden sectors (before 
-										///<   boot sector)
-	uint32_t 	total_sectors_long;		///< Total # of sectors; only valid if 
-										///<   total_sectors_short is 0
+	uint8_t 	jump[3];					///< Intel 80x86 jump instruction
+	uint8_t		oem_name[8];				///< OEM name
+	uint16_t 	sector_size;				///< Sector size in Bytes
+	uint8_t 	sectors_per_cluster;		///< Number of sectors per cluster
+	uint16_t	reserved_sectors;			///< Reserved sectors
+	uint8_t 	num_FATs;					///< Number of FATs
+	uint16_t	num_root_entries;			///< Number entries in root dir
+	uint16_t 	total_sectors_short;		///< Total # of sectors; if 0 see  
+											///<   later field
+	uint8_t 	media_descriptor;			///< Media descriptor
+	uint16_t 	sectors_per_FAT;			///< Number of sectors per FAT
+	uint16_t 	sectors_per_cylinder;		///< Number of sectors per track 
+											///<   (cylinder), CHS addressing
+	uint16_t 	num_heads;					///< Number of heads, CHS addressing
+	uint32_t 	num_hidden_sectors;			///< Number of hidden sectors (before 
+											///<   boot sector)
+	uint32_t 	total_sectors_long;			///< Total # of sectors; only valid if 
+											///<   total_sectors_short is 0
 
-	uint8_t 	drive_number;			///< Drive number
-	uint8_t 	current_head;			///< Current head
-	uint8_t 	boot_signature;			///< Boot signature; 0x29 indicates next
-										///<   three fields valid
-	uint32_t 	volume_id;				///< Volume ID (serial number)
-	uint8_t		volume_label[11];		///< Volume label
-	uint8_t		fs_type[8];				///< File system type
-	uint8_t		boot_code[448];			///< Boot code
-	uint16_t	boot_sector_signature;	///< Must be 0x55AA
-} __attribute((packed)) FAT16BootSector;
+	uint8_t 	drive_number;				///< Drive number
+	uint8_t 	current_head;				///< Current head
+	uint8_t 	boot_signature;				///< Boot signature; 0x29 means
+											///<   next three fields valid
+	uint32_t 	volume_id;					///< Volume ID (serial number)
+	uint8_t		volume_label[11];			///< Volume label
+	uint8_t		fs_type[8];					///< File system type
+	uint8_t		boot_code[448];				///< Boot code
+	uint8_t		boot_sector_signature[2];	///< Must be 0x55AA
+} __attribute__((packed)) FAT16BootSector;
 
 int main(int argc, char *argv[]) {
 	int i, retVal;
 	Partition partitionTable[4];
 	FAT16BootSector bootSector;
+	DirEntry entry;
 	int boot_offset;
 
 	/* Open the FAT disk image file */
@@ -141,7 +144,14 @@ int main(int argc, char *argv[]) {
     printf("  volume_id: 0x%08X\n", bootSector.volume_id);
     printf("  Volume label: [%.11s]\n", bootSector.volume_label);
     printf("  Filesystem type: [%.8s]\n", bootSector.fs_type);
-    printf("  Boot sector signature: 0x%04X\n", bootSector.boot_sector_signature);
+    printf("  Boot sector signature: 0x%.2X%.2X\n", bootSector.boot_sector_signature[0], bootSector.boot_sector_signature[1]);
+
+    lseek(fd, (bootSector.reserved_sectors + bootSector.sectors_per_FAT * bootSector.num_FATs) * bootSector.sector_size, SEEK_SET);
+
+    for (i = 0; i < bootSector.num_root_entries; i++) {
+    	read(fd, &entry, sizeof(DirEntry));
+    	print_file_info(&entry);
+    }
 
 	/* Close the FAT disk image file */
 	retVal = close(fd);

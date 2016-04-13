@@ -1,17 +1,17 @@
 TARGET = poo_nuggets
 
-OBJS = main.o
+OBJS = main.o root_dir.o
 
 CC = gcc
-CFLAGS = -c -Wall
+CFLAGS = -Wall
 
-all: poo_nugs
+all: $(TARGET)
 
-poo_nugs: main.o
-	$(CC) main.o -o $(TARGET)
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
 
-main.o: main.c
-	$(CC) $(CFLAGS) main.c
+root_dir.o: root_dir.c root_dir.h
+	$(CC) -c $(CFLAGS) root_dir.c -o root_dir.o
 
 clean:
 	rm -f $(OBJS) $(TARGET)
