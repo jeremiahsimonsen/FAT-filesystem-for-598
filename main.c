@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define IMAGE_FILE "test.img"
+#define IMAGE_FILE "fat.img"
 
 #define PARTITION_TABLE_OFFSET 0x1BE
 
