@@ -110,6 +110,13 @@ int main(int argc, char *argv[]) {
 		boot_offset = 512*partitionTable[i].start_sector;
 	}
 
+	// seek to FAT
+    // not quite sure how this offset works...I think it's magic
+    retVal = lseek(fd, );
+    for (i = 0; i < bootSector.num_FATs; i++) {
+
+    }
+
 	/* Seek to MBR */
 	retVal = lseek(fd, boot_offset, SEEK_SET);
 	if (retVal < 0) {
@@ -152,6 +159,9 @@ int main(int argc, char *argv[]) {
     	read(fd, &entry, sizeof(DirEntry));
     	print_file_info(&entry);
     }
+
+
+
 
 	/* Close the FAT disk image file */
 	retVal = close(fd);
