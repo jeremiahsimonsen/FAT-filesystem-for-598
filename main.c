@@ -110,13 +110,6 @@ int main(int argc, char *argv[]) {
 		boot_offset = 512*partitionTable[i].start_sector;
 	}
 
-	// seek to FAT
-    // not quite sure how this offset works...I think it's magic
-    retVal = lseek(fd, );
-    for (i = 0; i < bootSector.num_FATs; i++) {
-
-    }
-
 	/* Seek to MBR */
 	retVal = lseek(fd, boot_offset, SEEK_SET);
 	if (retVal < 0) {
@@ -130,6 +123,16 @@ int main(int argc, char *argv[]) {
 		perror("Error reading boot sector");
 		return errno;
 	}
+
+	// seek to FAT
+    // not quite sure how this offset works...I think it's magic
+    fat_start = ftell(fd) + (bootSector.reserved_sectors-1) * bootSector.sector_size;
+    root_start = fat_start + bootSector.sectors_per_FAT * bootSector.num_FATs * bootSector.sector_size;
+    data_start = root_start + bootSector.num_root_entries * sizeof(DirEntry);
+    for (i = 0; i < bootSector.num_FATs; i++) {
+
+
+    }
 
 	printf("  Jump code: %02X:%02X:%02X\n", bootSector.jump[0], bootSector.jump[1], bootSector.jump[2]);
     printf("  OEM code: [%.8s]\n", bootSector.oem_name);
