@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -8,7 +9,8 @@
 
 #include "root_dir.h"
 
-#define IMAGE_FILE "fat.img"
+// #define IMAGE_FILE "fat.img"
+#define IMAGE_FILE "fat_tutorial1/test.img"
 
 #define PARTITION_TABLE_OFFSET 0x1BE
 
@@ -60,6 +62,8 @@ typedef struct {
 } __attribute__((packed)) FAT16BootSector;
 
 int main(int argc, char *argv[]) {
+	int debug = 1;
+
 	int i, retVal;
 	Partition partitionTable[4];
 	FAT16BootSector bootSector;
@@ -67,25 +71,33 @@ int main(int argc, char *argv[]) {
 	int boot_offset;
 
 	/* Open the FAT disk image file */
-	int fd = open(IMAGE_FILE, O_RDONLY);
-	if (fd < 0) {
-		perror("Error opening file");
+	FILE *fff = fopen(IMAGE_FILE, "rb");
+	if (fff == NULL) {
+		printf("Error opening file\n");
+		fclose(fff);
 		return errno;
 	}
+	if (debug) printf("Opened %s\n",IMAGE_FILE);
 
 	/* Seek to the start of the partition table in the MBR */
-	retVal = lseek(fd, PARTITION_TABLE_OFFSET, SEEK_SET);
+	retVal = fseek(fff, PARTITION_TABLE_OFFSET, SEEK_SET);
 	if (retVal < 0) {
-		perror("Error seeking to partition table");
+		printf("Error seeking to partition table\n");
+		fclose(fff);
 		return errno;
 	}
 
+	if (debug) printf("Seeked to partition table\n");
+
 	/* Read the partition table */
-	retVal = read(fd, partitionTable, 4*sizeof(Partition));
-	if (retVal < 0) {
-		perror("Error reading partitions");
+	fread(partitionTable, sizeof(Partition), 4, fff);
+	if (ferror(fff) != 0) {
+		printf("Error reading partitions\n");
+		fclose(fff);
 		return errno;
 	}
+
+	if (debug) printf("Read partition tables\n");
 
 	/* Print partition info and check if there is a valid FAT16 partition */
 	for (i = 0; i < 4; i++) {
@@ -111,28 +123,34 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* Seek to MBR */
-	retVal = lseek(fd, boot_offset, SEEK_SET);
+	retVal = fseek(fff, boot_offset, SEEK_SET);
 	if (retVal < 0) {
-		perror("Error seeking to beginning");
+		printf("Error seeking to beginning\n");
+		fclose(fff);
 		return errno;
 	}
 
+	if (debug) printf("Successfully seeked to beginning of MBR\n");
+
 	/* Read the boot sector */
-	retVal = read(fd, &bootSector, sizeof(FAT16BootSector));
-	if (retVal < 0) {
-		perror("Error reading boot sector");
+	fread(&bootSector, sizeof(FAT16BootSector), 1, fff);
+	if (ferror(fff) != 0) {
+		printf("Error reading boot sector\n");
+		fclose(fff);
 		return errno;
 	}
+
+	if (debug) printf("Successfully read boot sector\n");
 
 	// seek to FAT
     // not quite sure how this offset works...I think it's magic
-    fat_start = ftell(fd) + (bootSector.reserved_sectors-1) * bootSector.sector_size;
-    root_start = fat_start + bootSector.sectors_per_FAT * bootSector.num_FATs * bootSector.sector_size;
-    data_start = root_start + bootSector.num_root_entries * sizeof(DirEntry);
-    for (i = 0; i < bootSector.num_FATs; i++) {
+    // fat_start = ftell(fff) + (bootSector.reserved_sectors-1) * bootSector.sector_size;
+    // root_start = fat_start + bootSector.sectors_per_FAT * bootSector.num_FATs * bootSector.sector_size;
+    // data_start = root_start + bootSector.num_root_entries * sizeof(DirEntry);
+    // for (i = 0; i < bootSector.num_FATs; i++) {
 
 
-    }
+    // }
 
 	printf("  Jump code: %02X:%02X:%02X\n", bootSector.jump[0], bootSector.jump[1], bootSector.jump[2]);
     printf("  OEM code: [%.8s]\n", bootSector.oem_name);
@@ -156,22 +174,32 @@ int main(int argc, char *argv[]) {
     printf("  Filesystem type: [%.8s]\n", bootSector.fs_type);
     printf("  Boot sector signature: 0x%.2X%.2X\n", bootSector.boot_sector_signature[0], bootSector.boot_sector_signature[1]);
 
-    lseek(fd, (bootSector.reserved_sectors + bootSector.sectors_per_FAT * bootSector.num_FATs) * bootSector.sector_size, SEEK_SET);
+    if (debug) printf("Now at 0x%X, sector size %d, FAT size %d sectors, %d FATs\n\n", ftell(fff), bootSector.sector_size, bootSector.sectors_per_FAT, bootSector.num_FATs);
+
+    retVal = fseek(fff, (bootSector.reserved_sectors-1 + 
+    	bootSector.sectors_per_FAT * bootSector.num_FATs) * 
+    	bootSector.sector_size, SEEK_CUR);
+    if (retVal < 0) {
+		printf("Error seeking to rootdir\n");
+		fclose(fff);
+		return errno;
+	}
+
+	if (debug) printf("Successfully seeked to rootdir\n");
 
     for (i = 0; i < bootSector.num_root_entries; i++) {
-    	read(fd, &entry, sizeof(DirEntry));
+    	retVal = fread(&entry, sizeof(DirEntry), 1, fff);
+    	if (ferror(fff) != 0) {
+    		printf("Error reading rootdir entry #%d\n",i);
+			fclose(fff);
+    		return errno;
+    	}
     	print_file_info(&entry);
     }
 
 
-
-
 	/* Close the FAT disk image file */
-	retVal = close(fd);
-	if (retVal < 0) {
-		perror("Error closing file");
-		return errno;
-	}
+	fclose(fff);
 
 	return 0;
 }
