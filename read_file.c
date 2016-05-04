@@ -52,6 +52,51 @@ typedef struct {
 	uint8_t		boot_sector_signature[2];	///< Must be 0x55AA
 } __attribute__((packed)) FAT16BootSector;
 
+void fat_read_file(FILE * in, FILE * out,
+                   unsigned long fat_start, 
+                   unsigned long data_start, 
+                   unsigned long cluster_size, 
+                   unsigned short cluster, 
+                   unsigned long file_size) {
+    unsigned char buffer[4096];
+    size_t bytes_read, bytes_to_read,
+           file_left = file_size, cluster_left = cluster_size;
+
+    // Go to first data cluster
+    fseek(in, data_start + cluster_size * (cluster-2), SEEK_SET);
+    
+    // Read until we run out of file or clusters
+    while(file_left > 0 && cluster != 0xFFFF) {
+        bytes_to_read = sizeof(buffer);
+        
+        // don't read past the file or cluster end
+        if(bytes_to_read > file_left)
+            bytes_to_read = file_left;
+        if(bytes_to_read > cluster_left)
+            bytes_to_read = cluster_left;
+        
+        // read data from cluster, write to file
+        bytes_read = fread(buffer, 1, bytes_to_read, in);
+        fwrite(buffer, 1, bytes_read, out);
+        printf("Copied %d bytes\n", bytes_read);
+        
+        // decrease byte counters for current cluster and whole file
+        cluster_left -= bytes_read;
+        file_left -= bytes_read;
+        
+        // if we have read the whole cluster, read next cluster # from FAT
+        if(cluster_left == 0) {
+            fseek(in, fat_start + cluster*2, SEEK_SET);
+            fread(&cluster, 2, 1, in);
+            
+            printf("End of cluster reached, next cluster %d\n", cluster);
+            
+            fseek(in, data_start + cluster_size * (cluster-2), SEEK_SET);
+            cluster_left = cluster_size; // reset cluster byte counter
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
 	int i, retVal;
 	Partition partitionTable[4];
@@ -61,13 +106,36 @@ int main(int argc, char *argv[]) {
 
 	uint32_t fat_start, root_start, data_start;
 
-	/* Open the FAT disk image file */
-	FILE *fff = fopen(IMAGE_FILE, "rb");
-	if (fff == NULL) {
-		printf("Error opening file\n");
-		fclose(fff);
-		return errno;
+	/* START copy from fat_tutorial2/read_file.c */
+	FILE *in, *out;
+	char filename[9] = "        ", file_ext[4] = "   "; // initially pad with spaces
+
+	if (argc < 3) {
+		printf("Usage: read_file <fs_image> <FILE.EXT>\n");
+		return 0;
 	}
+
+	if((in = fopen(argv[1],"rb")) == NULL) {
+		printf("Filesystem image file %s not found!\n", argv[1]);
+		return -1;
+	}
+
+	// Copy filename and extension to space-padded search strings
+	for(i=0; i<8 && argv[2][i] != '.' && argv[2][i] != 0; i++)
+		filename[i] = argv[2][i];
+	for(j=1; j<=3 && argv[2][i+j] != 0; j++)
+		file_ext[j-1] = argv[2][i+j];
+		
+	printf("Opened %s, looking for [%s.%s]\n", argv[1], filename, file_ext);
+	/* END copy from fat_tutorial2/read_file.c */
+
+	/* Open the FAT disk image file */
+	// FILE *fff = fopen(IMAGE_FILE, "rb");
+	// if (fff == NULL) {
+	// 	printf("Error opening file\n");
+	// 	fclose(fff);
+	// 	return errno;
+	// }
 
 	/* Seek to the start of the partition table in the MBR */
 	retVal = fseek(fff, PARTITION_TABLE_OFFSET, SEEK_SET);
@@ -148,10 +216,16 @@ int main(int argc, char *argv[]) {
     	print_file_info(&entry);
     }
 
-    // TODO: Print file contents
+	/* START copy from fat_tutorial2/read_file.c */
+    out = fopen(argv[2], "wb");
+    fat_read_file(in, out, fat_start, data_start, 
+    	bootSector.sectors_per_cluster*bootSector.sector_size, 
+    	entry.start_cluster, entry.size);
+    fclose(out);
+    fclose(in);
 
 	/* Close the FAT disk image file */
-	fclose(fff);
+	// fclose(fff);
 
 	return 0;
 }
