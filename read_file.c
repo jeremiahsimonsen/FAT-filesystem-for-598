@@ -98,7 +98,7 @@ void fat_read_file(FILE * in, FILE * out,
 }
 
 int main(int argc, char *argv[]) {
-	int i, retVal;
+	int i,j, retVal;
 	Partition partitionTable[4];
 	FAT16BootSector bootSector;
 	DirEntry entry;
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
 	uint32_t fat_start, root_start, data_start;
 
 	/* START copy from fat_tutorial2/read_file.c */
-	FILE *in, *out;
+	FILE *fff, *out;
 	char filename[9] = "        ", file_ext[4] = "   "; // initially pad with spaces
 
 	if (argc < 3) {
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	if((in = fopen(argv[1],"rb")) == NULL) {
+	if((fff = fopen(argv[1],"rb")) == NULL) {
 		printf("Filesystem image file %s not found!\n", argv[1]);
 		return -1;
 	}
@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
 	// if (fff == NULL) {
 	// 	printf("Error opening file\n");
 	// 	fclose(fff);
-	// 	return errno;
+	// 	return -1;
 	// }
 
 	/* Seek to the start of the partition table in the MBR */
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
 	if (retVal < 0) {
 		printf("Error seeking to partition table\n");
 		fclose(fff);
-		return errno;
+		return -1;
 	}
 
 	/* Read the partition table */
@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
 	if (ferror(fff) != 0) {
 		printf("Error reading partitions\n");
 		fclose(fff);
-		return errno;
+		return -1;
 	}
 
 	/* Print partition info and check if there is a valid FAT16 partition */
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
 	if (retVal < 0) {
 		printf("Error seeking to beginning\n");
 		fclose(fff);
-		return errno;
+		return -1;
 	}
 
 	/* Read the boot sector */
@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
 	if (ferror(fff) != 0) {
 		printf("Error reading boot sector\n");
 		fclose(fff);
-		return errno;
+		return -1;
 	}
 
 	/* Calculate start locations of FAT, root dir, and data */
@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
     if (retVal < 0) {
 		printf("Error seeking to rootdir\n");
 		fclose(fff);
-		return errno;
+		return -1;
 	}
 
 	/* Dump info for each root dir entry */
@@ -211,18 +211,18 @@ int main(int argc, char *argv[]) {
     	if (ferror(fff) != 0) {
     		printf("Error reading rootdir entry #%d\n",i);
 			fclose(fff);
-    		return errno;
+    		return -1;
     	}
     	print_file_info(&entry);
     }
 
 	/* START copy from fat_tutorial2/read_file.c */
     out = fopen(argv[2], "wb");
-    fat_read_file(in, out, fat_start, data_start, 
+    fat_read_file(fff, out, fat_start, data_start, 
     	bootSector.sectors_per_cluster*bootSector.sector_size, 
     	entry.start_cluster, entry.size);
     fclose(out);
-    fclose(in);
+    fclose(fff);
 
 	/* Close the FAT disk image file */
 	// fclose(fff);
