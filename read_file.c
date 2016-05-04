@@ -214,6 +214,17 @@ int main(int argc, char *argv[]) {
     		return -1;
     	}
     	print_file_info(&entry);
+
+    	if (memcmp(entry.filename, filename, 8) == 0 &&
+    		memcmp(entry.ext, file_ext, 3) == 0) {
+    		printf("File found\n");
+    		break;
+    	}
+    }
+
+    if (i == bootSector.num_root_entries) {
+    	printf("File not found\n");
+    	return -1;
     }
 
 	/* START copy from fat_tutorial2/read_file.c */

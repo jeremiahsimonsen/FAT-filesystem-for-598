@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+/**
+ * @brief A directory entry
+ */
 typedef struct {
 	uint8_t		filename[8];	///< Name of the file; 0th byte meaning:
 								///< 	0x00: Unused
